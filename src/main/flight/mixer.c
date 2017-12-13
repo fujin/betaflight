@@ -84,9 +84,10 @@ void pgResetFn_motorConfig(motorConfig_t *motorConfig)
     } else
 #endif
     {
-        motorConfig->minthrottle = 1070;
-        motorConfig->dev.motorPwmRate = BRUSHLESS_MOTORS_PWM_RATE;
-        motorConfig->dev.motorPwmProtocol = PWM_TYPE_ONESHOT125;
+        motorConfig->minthrottle = 1050;
+        motorConfig->dev.motorPwmRate = 32000;
+        motorConfig->dev.motorPwmProtocol = PWM_TYPE_MULTISHOT;
+        motorConfig->dev.useUnsyncedPwm = true;
     }
 #endif
     motorConfig->maxthrottle = 2000;
