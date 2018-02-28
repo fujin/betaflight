@@ -231,7 +231,7 @@ void pidInitFilters(const pidProfile_t *pidProfile)
             dtermLpfApplyFn = (filterApplyFnPtr)pt1FilterApply;
             for (int axis = FD_ROLL; axis <= FD_PITCH; axis++) {
                 dtermFilterLpf[axis] = &dtermFilterLpfUnion.pt1Filter[axis];
-                pt1FilterInit(dtermFilterLpf[axis], pidProfile->dterm_lpf_hz, dT);
+                pt1FilterInit(dtermFilterLpf[axis], pt1FilterGain(pidProfile->dterm_lpf_hz, dT));
             }
             break;
         case FILTER_BIQUAD:
@@ -259,7 +259,7 @@ void pidInitFilters(const pidProfile_t *pidProfile)
     } else {
         ptermYawFilterApplyFn = (filterApplyFnPtr)pt1FilterApply;
         ptermYawFilter = &pt1FilterYaw;
-        pt1FilterInit(ptermYawFilter, pidProfile->yaw_lpf_hz, dT);
+        pt1FilterInit(ptermYawFilter, pt1FilterGain(pidProfile->yaw_lpf_hz, dT));
     }
 }
 
