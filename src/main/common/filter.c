@@ -308,39 +308,33 @@ void biquadRCFIR2FilterInit(biquadFilter_t *filter, uint16_t f_cut, float dT)
 {
     float RC = 1.0f / ( 2.0f * M_PI_FLOAT * f_cut );
     float k = dT / (RC + dT);
+
     filter->b0 = k / 2;
     filter->b1 = k / 2;
     filter->b2 = 0;
     filter->a1 = -(1 - k);
     filter->a2 = 0;
+
+    // zero initial samples
+    filter->x1 = filter->x2 = 0;
+    filter->y1 = filter->y2 = 0;
 }
 
-// Fast two-state Kalman
-void fastKalmanInit(fastKalman_t *filter, float q, float r, float p)
+// rs2k's fast "kalman" filter
+void fastKalmanInit(fastKalman_t *filter, uint16_t f_cut, float dT)
 {
-    filter->q     = q * 0.000001f; // add multiplier to make tuning easier
-    filter->r     = r * 0.001f;    // add multiplier to make tuning easier
-    filter->p     = p * 0.001f;    // add multiplier to make tuning easier
+    float RC = 1.0f / ( 2.0f * M_PI_FLOAT * f_cut );
+    float a = dT / (RC + dT);
+
     filter->x     = 0.0f;          // set initial value, can be zero if unknown
     filter->lastX = 0.0f;          // set initial value, can be zero if unknown
-    filter->k     = 0.0f;          // kalman gain
+    filter->k     = a / 2;         // "kalman" gain - half of RC coefficient
 }
 
 FAST_CODE float fastKalmanUpdate(fastKalman_t *filter, float input)
 {
-    // project the state ahead using acceleration
     filter->x += (filter->x - filter->lastX);
-
-    // update last state
     filter->lastX = filter->x;
-
-    // prediction update
-    filter->p = filter->p + filter->q;
-
-    // measurement update
-    filter->k = filter->p / (filter->p + filter->r);
     filter->x += filter->k * (input - filter->x);
-    filter->p = (1.0f - filter->k) * filter->p;
-
     return filter->x;
 }

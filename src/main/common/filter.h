@@ -54,10 +54,7 @@ typedef struct firFilterDenoise_s {
 } firFilterDenoise_t;
 
 typedef struct fastKalman_s {
-    float q;       // process noise covariance
-    float r;       // measurement noise covariance
-    float p;       // estimation error covariance matrix
-    float k;       // kalman gain
+    float k;       // "kalman" gain
     float x;       // state
     float lastX;   // previous state
 } fastKalman_t;
@@ -66,7 +63,9 @@ typedef enum {
     FILTER_PT1 = 0,
     FILTER_BIQUAD,
     FILTER_FIR,
-    FILTER_SLEW
+    FILTER_SLEW,
+    FILTER_BIQUAD_RC_FIR2,
+    FILTER_FAST_KALMAN
 } filterType_e;
 
 typedef enum {
@@ -98,7 +97,7 @@ float filterGetNotchQ(uint16_t centerFreq, uint16_t cutoff);
 
 void biquadRCFIR2FilterInit(biquadFilter_t *filter, uint16_t f_cut, float dT);
 
-void fastKalmanInit(fastKalman_t *filter, float q, float r, float p);
+void fastKalmanInit(fastKalman_t *filter, uint16_t f_cut, float dT);
 float fastKalmanUpdate(fastKalman_t *filter, float input);
 
 // not exactly correct, but very very close and much much faster
