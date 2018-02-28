@@ -64,20 +64,28 @@ typedef struct gyroConfig_s {
     uint8_t  gyroMovementCalibrationThreshold; // people keep forgetting that moving model while init results in wrong gyro offsets. and then they never reset gyro. so this is now on by default.
     uint8_t  gyro_sync_denom;                  // Gyro sample divider
     uint8_t  gyro_lpf;                         // gyro LPF setting - values are driver specific, in case of invalid number, a reasonable default ~30-40HZ is chosen.
-    uint8_t  gyro_soft_lpf_type;
-    uint8_t  gyro_soft_lpf_hz;
+
     bool     gyro_high_fsr;
     bool     gyro_use_32khz;
     uint8_t  gyro_to_use;
-    uint16_t gyro_soft_lpf_hz_2;
+
+    // Lagged Moving Average smoother
+    uint8_t gyro_lma_depth;
+    uint8_t gyro_lma_weight;
+
+    // Lowpass 2 is the FKF, Biquad RC+FIR2, or PT1 options. Applied before dynamic notch.
+    // Lowpass is the older soft LPF: Biquad, PT1 or Denoise. Applied after dynamic notch and static notch 1/2.
+    uint8_t  gyro_lowpass_type;
+    uint8_t  gyro_lowpass2_type;
+
+    uint16_t gyro_lowpass_hz;
+    uint16_t  gyro_lowpass2_hz;
+
     uint16_t gyro_soft_notch_hz_1;
     uint16_t gyro_soft_notch_cutoff_1;
     uint16_t gyro_soft_notch_hz_2;
     uint16_t gyro_soft_notch_cutoff_2;
     gyroOverflowCheck_e checkOverflow;
-    uint16_t gyro_filter_q;
-    uint16_t gyro_filter_r;
-    uint16_t gyro_filter_p;
     int16_t  gyro_offset_yaw;
 } gyroConfig_t;
 

@@ -25,6 +25,8 @@
 #define MAX_FIR_DENOISE_WINDOW_SIZE 120
 #endif
 
+#define MAX_LMA_WINDOW_SIZE 12
+
 struct filter_s;
 typedef struct filter_s filter_t;
 
@@ -54,20 +56,26 @@ typedef struct firFilterDenoise_s {
 } firFilterDenoise_t;
 
 typedef struct fastKalman_s {
-    float q;       // process noise covariance
-    float r;       // measurement noise covariance
-    float p;       // estimation error covariance matrix
-    float k;       // kalman gain
+    float k;       // "kalman" gain
     float x;       // state
     float lastX;   // previous state
 } fastKalman_t;
+
+typedef struct laggedMovingAverage_s {
+    int movingWindowIndex;
+    int windowSize;
+    float weight;
+    float movingSum;
+    float buf[MAX_LMA_WINDOW_SIZE];
+} laggedMovingAverage_t;
 
 typedef enum {
     FILTER_PT1 = 0,
     FILTER_BIQUAD,
     FILTER_FIR,
-    FILTER_SLEW
-} filterType_e;
+    FILTER_BIQUAD_RC_FIR2,
+    FILTER_FAST_KALMAN
+} lowpassFilterType_e;
 
 typedef enum {
     FILTER_LPF,
@@ -96,15 +104,19 @@ float biquadFilterApplyDF1(biquadFilter_t *filter, float input);
 float biquadFilterApply(biquadFilter_t *filter, float input);
 float filterGetNotchQ(uint16_t centerFreq, uint16_t cutoff);
 
-void biquadRCFIR2FilterInit(biquadFilter_t *filter, uint16_t f_cut, float dT);
+void biquadRCFIR2FilterInit(biquadFilter_t *filter, float k);
 
-void fastKalmanInit(fastKalman_t *filter, float q, float r, float p);
+void fastKalmanInit(fastKalman_t *filter, float k);
 float fastKalmanUpdate(fastKalman_t *filter, float input);
+
+void lmaSmoothingInit(laggedMovingAverage_t *filter,int windowSize, float weight);
+float lmaSmoothingUpdate(laggedMovingAverage_t *filter, float input);
 
 // not exactly correct, but very very close and much much faster
 #define filterGetNotchQApprox(centerFreq, cutoff)   ((float)(cutoff * centerFreq) / ((float)(centerFreq - cutoff) * (float)(centerFreq + cutoff)))
 
-void pt1FilterInit(pt1Filter_t *filter, uint8_t f_cut, float dT);
+float pt1FilterGain(uint8_t f_cut, float dT);
+void pt1FilterInit(pt1Filter_t *filter, float k);
 float pt1FilterApply(pt1Filter_t *filter, float input);
 
 void slewFilterInit(slewFilter_t *filter, float slewLimit, float threshold);
