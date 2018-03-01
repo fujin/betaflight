@@ -912,11 +912,7 @@ static void subTaskMotorUpdate(timeUs_t currentTimeUs)
 
 uint8_t setPidUpdateCountDown(void)
 {
-    if (gyroConfig()->gyro_soft_lpf_hz) {
-        return pidConfig()->pid_process_denom - 1;
-    } else {
-        return 1;
-    }
+    return pidConfig()->pid_process_denom - 1;
 }
 
 // Function for loop trigger
