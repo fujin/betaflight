@@ -338,3 +338,24 @@ FAST_CODE float fastKalmanUpdate(fastKalman_t *filter, float input)
     filter->x += filter->k * (input - filter->x);
     return filter->x;
 }
+
+void lmaSmoothingInit(laggedMovingAverage_t *filter, uint8_t windowSize, float weight)
+{
+    filter->movingWindowIndex = 0;
+    filter->windowSize = windowSize;
+    filter->weight = weight;
+}
+
+float lmaSmoothingUpdate(laggedMovingAverage_t *filter, float input)
+{
+    if (filter->windowSize && filter->weight) {
+        filter->movingSum -= filter->buf[filter->movingWindowIndex];
+        filter->buf[filter->movingWindowIndex] = input;
+        filter->movingSum += input;
+        filter->movingWindowIndex = (filter->movingWindowIndex + 1) % filter->windowSize;
+
+        return input + (((filter->movingSum  / (float)filter->windowSize) - input) * filter->weight);
+    } else {
+        return input;
+    }
+}

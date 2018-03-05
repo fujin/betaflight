@@ -117,6 +117,10 @@ typedef struct gyroSensor_s {
     gyroStage1Filter_t stage1Filter;
     filter_t *stage1FilterPtr[XYZ_AXIS_COUNT];
 
+    // lagged moving average smoothing
+    filterApplyFnPtr lmaSmoothingApplyFn;
+    laggedMovingAverage_t lmaSmoothingFilter[XYZ_AXIS_COUNT];
+
     // stage2 gyro soft filter (biquad, pt1, denoise)
     filterApplyFnPtr stage2FilterApplyFn;
     gyroStage2Filter_t stage2Filter;
@@ -178,6 +182,8 @@ PG_RESET_TEMPLATE(gyroConfig_t, gyroConfig,
     .gyro_soft_notch_cutoff_2 = 100,
     .checkOverflow = GYRO_OVERFLOW_CHECK_ALL_AXES,
     .gyro_offset_yaw = 0,
+    .gyro_lma_depth = 2,
+    .gyro_lma_weight = 100,
 );
 
 
@@ -495,6 +501,20 @@ static void gyroInitStage1FilterLpf(gyroSensor_t *gyroSensor, uint16_t lpfHz)
     }
 }
 
+static void gyroInitLmaSmoothing(gyroSensor_t *gyroSensor, uint8_t depth, uint8_t weight)
+{
+    gyroSensor->lmaSmoothingApplyFn = nullFilterApply;
+
+    if (depth && weight) {
+        const uint8_t windowSize = depth + 1;
+        const float lmaWeight = weight * 0.01f;
+        gyroSensor->lmaSmoothingApplyFn = (filterApplyFnPtr)lmaSmoothingUpdate;
+        for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+            lmaSmoothingInit(&gyroSensor->lmaSmoothingFilter[axis], windowSize, lmaWeight);
+        }
+    }
+}
+
 static void gyroInitStage2FilterLpf(gyroSensor_t *gyroSensor, uint8_t lpfHz)
 {
     gyroSensor->stage2FilterApplyFn = nullFilterApply;
@@ -607,6 +627,7 @@ static void gyroInitSensorFilters(gyroSensor_t *gyroSensor)
     gyroInitSlewLimiter(gyroSensor);
 #endif
     gyroInitStage1FilterLpf(gyroSensor, gyroConfig()->gyro_stage1_soft_lpf_hz);
+    gyroInitLmaSmoothing(gyroSensor, gyroConfig()->gyro_lma_depth, gyroConfig()->gyro_lma_weight);
     gyroInitStage2FilterLpf(gyroSensor, gyroConfig()->gyro_stage2_soft_lpf_hz);
     gyroInitFilterNotch1(gyroSensor, gyroConfig()->gyro_soft_notch_hz_1, gyroConfig()->gyro_soft_notch_cutoff_1);
     gyroInitFilterNotch2(gyroSensor, gyroConfig()->gyro_soft_notch_hz_2, gyroConfig()->gyro_soft_notch_cutoff_2);
@@ -825,6 +846,7 @@ static FAST_CODE void gyroUpdateSensor(gyroSensor_t *gyroSensor, timeUs_t curren
             float gyroADCf = gyroSensor->gyroDev.gyroADC[axis] * gyroSensor->gyroDev.scale;
 
             gyroADCf = gyroSensor->stage1FilterApplyFn(gyroSensor->stage1FilterPtr[axis], gyroADCf);
+            gyroADCf = gyroSensor->lmaSmoothingApplyFn((filter_t *)&gyroSensor->lmaSmoothingFilter[axis], gyroADCf);
 
 #ifdef USE_GYRO_DATA_ANALYSE
             gyroADCf = gyroSensor->notchFilterDynApplyFn((filter_t *)&gyroSensor->notchFilterDyn[axis], gyroADCf);

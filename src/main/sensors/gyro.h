@@ -73,6 +73,9 @@ typedef struct gyroConfig_s {
     uint8_t  gyro_stage1_soft_lpf_type;
     uint16_t gyro_stage1_soft_lpf_hz;
 
+    uint8_t gyro_lma_depth;
+    uint8_t gyro_lma_weight;
+
     uint16_t gyro_soft_notch_hz_1;
     uint16_t gyro_soft_notch_cutoff_1;
     uint16_t gyro_soft_notch_hz_2;
