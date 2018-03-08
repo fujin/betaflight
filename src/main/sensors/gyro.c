@@ -99,11 +99,10 @@ typedef struct gyroCalibration_s {
 bool firstArmingCalibrationWasStarted = false;
 
 typedef union gyroLowpassFilter_u {
-    pt1Filter_t pt1FilterState[XYZ_AXIS_COUNT];
-    biquadFilter_t biquadFilterState[XYZ_AXIS_COUNT];
-    firFilterDenoise_t denoiseFilterState[XYZ_AXIS_COUNT];
-    biquadFilter_t biquadRCFIR2FilterState[XYZ_AXIS_COUNT];
-    fastKalman_t fastKalmanFilterState[XYZ_AXIS_COUNT];
+    pt1Filter_t pt1FilterState;
+    biquadFilter_t biquadFilterState;
+    firFilterDenoise_t denoiseFilterState;
+    fastKalman_t fastKalmanFilterState;
 } gyroLowpassFilter_t;
 
 typedef struct gyroSensor_s {
@@ -112,11 +111,11 @@ typedef struct gyroSensor_s {
 
     // lowpass gyro soft filter
     filterApplyFnPtr lowpassFilterApplyFn;
-    filter_t *lowpassFilterPtr[XYZ_AXIS_COUNT];
+    gyroLowpassFilter_t lowpassFilter[XYZ_AXIS_COUNT];
 
     // lowpass2 gyro soft filter
     filterApplyFnPtr lowpass2FilterApplyFn;
-    filter_t *lowpass2FilterPtr[XYZ_AXIS_COUNT];
+    gyroLowpassFilter_t lowpass2Filter[XYZ_AXIS_COUNT];
 
     // lagged moving average smoothing
     filterApplyFnPtr lmaSmoothingApplyFn;
@@ -555,14 +554,12 @@ bool gyroInit(void)
 
 void gyroInitLowpassFilterLpf(gyroSensor_t *gyroSensor, int section, int type, uint16_t lpfHz)
 {
-    // Used later to update *gyroSensor.
     filterApplyFnPtr lowpassFilterApplyFn = nullFilterApply;
-    gyroLowpassFilter_t lowpassFilter;
-    filter_t *lowpassFilterPtr[XYZ_AXIS_COUNT];
+    gyroLowpassFilter_t *lowpassFilter = section == 0 ? gyroSensor->lowpassFilter : gyroSensor->lowpass2Filter;
 
     // Establish some common constants
     const uint32_t gyroFrequencyNyquist = 1000000 / 2 / gyro.targetLooptime;
-    const float gyroDt = (float) gyro.targetLooptime * 0.000001f;
+    const float gyroDt = gyro.targetLooptime * 1e-6f;
 
     // Gain could be calculated a little later as it is specific to the pt1/bqrcf2/fkf branches
     const float gain = pt1FilterGain(lpfHz, gyroDt);
@@ -571,39 +568,34 @@ void gyroInitLowpassFilterLpf(gyroSensor_t *gyroSensor, int section, int type, u
     if (lpfHz && lpfHz <= gyroFrequencyNyquist) {
         switch (type) {
         case FILTER_PT1:
-            lowpassFilterApplyFn = (filterApplyFnPtr)pt1FilterApply;
+            lowpassFilterApplyFn = (filterApplyFnPtr) pt1FilterApply;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                lowpassFilterPtr[axis] = (filter_t *)&lowpassFilter.pt1FilterState[axis];
-                pt1FilterInit(&lowpassFilter.pt1FilterState[axis], gain);
+                pt1FilterInit(&lowpassFilter[axis].pt1FilterState, gain);
             }
             break;
         case FILTER_BIQUAD:
-            lowpassFilterApplyFn = (filterApplyFnPtr)biquadFilterApply;
+            lowpassFilterApplyFn = (filterApplyFnPtr) biquadFilterApply;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                lowpassFilterPtr[axis] = (filter_t *)&lowpassFilter.biquadFilterState[axis];
-                biquadFilterInitLPF(&lowpassFilter.biquadFilterState[axis], lpfHz, gyro.targetLooptime);
+                biquadFilterInitLPF(&lowpassFilter[axis].biquadFilterState, lpfHz, gyro.targetLooptime);
             }
             break;
         case FILTER_BIQUAD_RC_FIR2:
-            lowpassFilterApplyFn = (filterApplyFnPtr)biquadFilterApply;
+            lowpassFilterApplyFn = (filterApplyFnPtr) biquadFilterApply;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                lowpassFilterPtr[axis] = (filter_t *)&lowpassFilter.biquadRCFIR2FilterState[axis];
-                biquadRCFIR2FilterInit(&lowpassFilter.biquadRCFIR2FilterState[axis], gain);
+                biquadRCFIR2FilterInit(&lowpassFilter[axis].biquadFilterState, gain);
             }
             break;
 
         case FILTER_FAST_KALMAN:
             lowpassFilterApplyFn = (filterApplyFnPtr)fastKalmanUpdate;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                lowpassFilterPtr[axis] = (filter_t *)&lowpassFilter.fastKalmanFilterState[axis];
-                fastKalmanInit(&lowpassFilter.fastKalmanFilterState[axis], gain / 2);
+                fastKalmanInit(&lowpassFilter[axis].fastKalmanFilterState, gain / 2);
             }
             break;
         default:
             lowpassFilterApplyFn = (filterApplyFnPtr)firFilterDenoiseUpdate;
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                lowpassFilterPtr[axis] = (filter_t *)&lowpassFilter.denoiseFilterState[axis];
-                firFilterDenoiseInit(&lowpassFilter.denoiseFilterState[axis], lpfHz, gyro.targetLooptime);
+                firFilterDenoiseInit(&lowpassFilter[axis].denoiseFilterState, lpfHz, gyro.targetLooptime);
             }
             break;
         }
@@ -613,16 +605,10 @@ void gyroInitLowpassFilterLpf(gyroSensor_t *gyroSensor, int section, int type, u
     switch (section) {
     case 0:
         gyroSensor->lowpassFilterApplyFn = lowpassFilterApplyFn;
-        for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-            gyroSensor->lowpassFilterPtr[axis] = (filter_t *)&lowpassFilterPtr[axis];
-        }
         break;
 
     case 1:
         gyroSensor->lowpass2FilterApplyFn = lowpassFilterApplyFn;
-        for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-            gyroSensor->lowpass2FilterPtr[axis] = (filter_t *)&lowpassFilterPtr[axis];
-        }
         break;
 
     default:
@@ -963,7 +949,7 @@ static FAST_CODE void gyroUpdateSensor(gyroSensor_t *gyroSensor, timeUs_t curren
             // NOTE: this branch optimized for when there is no gyro debugging, ensure it is kept in step with non-optimized branch
             float gyroADCf = gyroSensor->gyroDev.gyroADC[axis] * gyroSensor->gyroDev.scale;
 
-            gyroADCf = gyroSensor->lowpassFilterApplyFn(gyroSensor->lowpassFilterPtr[axis], gyroADCf);
+            gyroADCf = gyroSensor->lowpassFilterApplyFn((filter_t *)&gyroSensor->lowpassFilter[axis], gyroADCf);
             gyroADCf = gyroSensor->lmaSmoothingApplyFn((filter_t *)&gyroSensor->lmaSmoothingFilter[axis], gyroADCf);
 
 #ifdef USE_GYRO_DATA_ANALYSE
@@ -971,7 +957,7 @@ static FAST_CODE void gyroUpdateSensor(gyroSensor_t *gyroSensor, timeUs_t curren
 #endif
             gyroADCf = gyroSensor->notchFilter1ApplyFn((filter_t *)&gyroSensor->notchFilter1[axis], gyroADCf);
             gyroADCf = gyroSensor->notchFilter2ApplyFn((filter_t *)&gyroSensor->notchFilter2[axis], gyroADCf);
-            gyroADCf = gyroSensor->lowpass2FilterApplyFn(gyroSensor->lowpass2FilterPtr[axis], gyroADCf);
+            gyroADCf = gyroSensor->lowpass2FilterApplyFn((filter_t *)&gyroSensor->lowpass2Filter[axis], gyroADCf);
             gyroSensor->gyroDev.gyroADCf[axis] = gyroADCf;
 
             if (!gyroSensor->overflowDetected) {
@@ -989,7 +975,7 @@ static FAST_CODE void gyroUpdateSensor(gyroSensor_t *gyroSensor, timeUs_t curren
             DEBUG_SET(DEBUG_GYRO_NOTCH, axis, lrintf(gyroADCf));
 
             // apply lowpass LPF
-            gyroADCf = gyroSensor->lowpassFilterApplyFn(gyroSensor->lowpassFilterPtr[axis], gyroADCf);
+            gyroADCf = gyroSensor->lowpassFilterApplyFn((filter_t *)&gyroSensor->lowpassFilter[axis], gyroADCf);
 
 #ifdef USE_GYRO_DATA_ANALYSE
             // apply dynamic notch filter
@@ -1010,7 +996,7 @@ static FAST_CODE void gyroUpdateSensor(gyroSensor_t *gyroSensor, timeUs_t curren
 
             // apply 'lowpass2' LPF
             DEBUG_SET(DEBUG_GYRO, axis, lrintf(gyroADCf));
-            gyroADCf = gyroSensor->lowpass2FilterApplyFn(gyroSensor->lowpass2FilterPtr[axis], gyroADCf);
+            gyroADCf = gyroSensor->lowpass2FilterApplyFn((filter_t *)&gyroSensor->lowpass2Filter[axis], gyroADCf);
 
             gyroSensor->gyroDev.gyroADCf[axis] = gyroADCf;
             if (!gyroSensor->overflowDetected) {
