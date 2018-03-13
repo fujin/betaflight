@@ -266,7 +266,8 @@ static const char * const lookupTableLowpassType[] = {
 #endif
     "BUTTERWORTH",
     "BIQUAD_RC_FIR2",
-    "FAST_KALMAN"
+    "FAST_KALMAN",
+    "ONE_EURO"
 };
 
 static const char * const lookupTableDtermLowpassType[] = {

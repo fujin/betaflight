@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 // Don't use it on F1 and F3 to lower RAM usage
 // FIR/Denoise filter can be cleaned up in the future as it is rarely used and used to be experimental
 #if (defined(STM32F1) || defined(STM32F3))
@@ -68,6 +69,32 @@ typedef struct fastKalman_s {
     float lastX;   // previous state
 } fastKalman_t;
 
+// "One Euro filter": http://cristal.univ-lille.fr/~casiez/1euro/
+//
+// Adaptive first-order low-pass filter. At low speeds, a low cutoff stabilizes
+// the signal by reducing jitter, but as speed increases, the cutoff is
+// increased to reduce lag.
+typedef struct oneEuroLowpassFilter_s {
+    float hatxprev;
+    float xprev;
+    bool usedBefore;
+} oneEuroLowpassFilter_t;
+
+typedef struct oneEuroFilterConfiguration_s {
+    float frequency;
+    float minCutoffFrequency;
+    float cutoffSlope;
+    float derivativeCutoffFrequency;
+} oneEuroFilterConfiguration_t;
+
+typedef struct oneEuroFilter_s {
+    oneEuroFilterConfiguration_t config;
+    oneEuroLowpassFilter_t xfilt;
+    oneEuroLowpassFilter_t dxfilt;
+    float lastTime;
+    float frequency;
+} oneEuroFilter_t;
+
 typedef struct laggedMovingAverage_s {
     uint16_t movingWindowIndex;
     uint16_t windowSize;
@@ -82,7 +109,8 @@ typedef enum {
     FILTER_FIR,
     FILTER_BUTTERWORTH,
     FILTER_BIQUAD_RC_FIR2,
-    FILTER_FAST_KALMAN
+    FILTER_FAST_KALMAN,
+    FILTER_ONE_EURO,
 } lowpassFilterType_e;
 
 typedef enum {
@@ -106,8 +134,6 @@ typedef float (*filterApplyFnPtr)(filter_t *filter, float input);
 
 float nullFilterApply(filter_t *filter, float input);
 
-
-
 void biquadFilterInitLPF(biquadFilter_t *filter, float filterFreq, uint32_t refreshRate);
 void biquadFilterInit(biquadFilter_t *filter, float filterFreq, uint32_t refreshRate, float Q, biquadFilterType_e filterType);
 void biquadFilterUpdate(biquadFilter_t *filter, float filterFreq, uint32_t refreshRate, float Q, biquadFilterType_e filterType);
@@ -125,6 +151,11 @@ float fastKalmanUpdate(fastKalman_t *filter, float input);
 
 void lmaSmoothingInit(laggedMovingAverage_t *filter, uint8_t windowSize, float weight);
 float lmaSmoothingUpdate(laggedMovingAverage_t *filter, float input);
+
+void oneEuroLowpassFilterInit(oneEuroLowpassFilter_t *filter);
+float oneEuroLowpassFilterUpdate(oneEuroLowpassFilter_t *filter, float x, float alpha);
+float oneEuroLowpassFilterApply(oneEuroFilter_t *filter, float x);
+float oneEuroLowpassFilterAlpha(oneEuroFilter_t *filter, float cutoff);
 
 float pt1FilterGain(uint16_t f_cut, float dT);
 void pt1FilterInit(pt1Filter_t *filter, float k);

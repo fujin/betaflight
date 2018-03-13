@@ -423,3 +423,71 @@ FAST_CODE float lmaSmoothingUpdate(laggedMovingAverage_t *filter, float input)
 
     return input + (((filter->movingSum  / filter->windowSize) - input) * filter->weight);
 }
+
+void oneEuroLowpassFilterInit(oneEuroLowpassFilter_t *filter)
+{
+    filter->usedBefore = false;
+    filter->hatxprev = 0;
+    filter->xprev = 0;
+}
+
+FAST_CODE float oneEuroLowpassFilterUpdate(oneEuroLowpassFilter_t *filter, float x, float alpha)
+{
+    // If this is the first time we have run, set the previous value to the current value.
+    if (!filter->usedBefore) {
+        filter->usedBefore = true;
+        filter->hatxprev = x;
+    }
+
+    float hatx = alpha * x + (1.f - alpha) * filter->hatxprev;
+
+    filter->xprev = x;
+    filter->hatxprev = hatx;
+
+    return hatx;
+}
+
+FAST_CODE float oneEuroLowpassFilterApply(oneEuroFilter_t *filter, float x)
+{
+    float dx = 0.f;
+
+    // Make sure the lpf frequency matches the parent filter configuration
+    if (filter->lastTime == 0 && filter->frequency != filter->config.frequency) {
+        filter->frequency = filter->config.frequency;
+    }
+
+    // Accumulate speed
+    if (filter->xfilt.usedBefore) {
+        dx = (x - filter->xfilt.xprev) * filter->frequency;
+    }
+
+    // Compute the filter derivate.
+    float edx = oneEuroLowpassFilterUpdate(
+        &(filter->dxfilt), dx,
+        oneEuroLowpassFilterAlpha(
+            filter,
+            filter->config.derivativeCutoffFrequency
+        )
+    );
+
+    // Calculate the moved filter cutoff based on the minimum filter cutoff, the
+    // slope (beta), and the filtered speed
+    float cutoff = filter->config.minCutoffFrequency + filter->config.cutoffSlope * fabsf(edx);
+
+    // Compute the actual filter state based on the previously established cutoff.
+    return oneEuroLowpassFilterUpdate(
+        &(filter->xfilt), x,
+        oneEuroLowpassFilterAlpha(filter, cutoff)
+    );
+}
+
+// XXX(fujin): this seems shocklingy similar to the pt1FilterGain function I
+// already introduced. investigate replacing with pt1FilterGain, or
+// standardizing on a re-usable 'alpha' function if that is the correct
+// terminology
+FAST_CODE float oneEuroLowpassFilterAlpha(oneEuroFilter_t *filter, float cutoff)
+{
+    float tau = 1.0f / (2.f * M_PI * cutoff); // RC
+    float te = 1.0f / filter->frequency;
+    return 1.0f / (1.0f + tau / te);
+}
