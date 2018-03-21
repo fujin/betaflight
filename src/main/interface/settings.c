@@ -252,11 +252,23 @@ static const char * const lookupTableRcInterpolationChannels[] = {
     "RP", "RPY", "RPYT"
 };
 
-static const char * const lookupTableLowpassType[] = {
+static const char * const lookupTableDTermLowpassType[] = {
     "PT1",
     "BIQUAD",
 #if defined(USE_FIR_FILTER_DENOISE)
     "FIR",
+#else
+    "",
+#endif
+};
+
+static const char * const lookupTableGyroLowpassType[] = {
+    "PT1",
+    "BIQUAD",
+#if defined(USE_FIR_FILTER_DENOISE)
+    "FIR",
+#else
+    "",
 #endif
     "BUTTERWORTH",
     "BIQUAD_RC_FIR2",
@@ -341,7 +353,8 @@ const lookupTableEntry_t lookupTables[] = {
     { lookupTablePwmProtocol, sizeof(lookupTablePwmProtocol) / sizeof(char *) },
     { lookupTableRcInterpolation, sizeof(lookupTableRcInterpolation) / sizeof(char *) },
     { lookupTableRcInterpolationChannels, sizeof(lookupTableRcInterpolationChannels) / sizeof(char *) },
-    { lookupTableLowpassType, sizeof(lookupTableLowpassType) / sizeof(char *) },
+    { lookupTableDTermLowpassType, sizeof(lookupTableDTermLowpassType) / sizeof(char *) },
+    { lookupTableGyroLowpassType, sizeof(lookupTableGyroLowpassType) / sizeof(char *) },
     { lookupTableFailsafe, sizeof(lookupTableFailsafe) / sizeof(char *) },
     { lookupTableCrashRecovery, sizeof(lookupTableCrashRecovery) / sizeof(char *) },
 #ifdef USE_CAMERA_CONTROL
@@ -378,11 +391,11 @@ const clivalue_t valueTable[] = {
 #endif
     { "gyro_sync_denom",            VAR_UINT8  | MASTER_VALUE, .config.minmax = { 1, 32 }, PG_GYRO_CONFIG, offsetof(gyroConfig_t, gyro_sync_denom) },
 
-    { "gyro_lowpass_type",         VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_LOWPASS_TYPE }, PG_GYRO_CONFIG, offsetof(gyroConfig_t, gyro_lowpass_type) },
+    { "gyro_lowpass_type",         VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_GYRO_LOWPASS_TYPE }, PG_GYRO_CONFIG, offsetof(gyroConfig_t, gyro_lowpass_type) },
     { "gyro_lowpass_hz",           VAR_UINT16 | MASTER_VALUE, .config.minmax = { 0, 16000 }, PG_GYRO_CONFIG, offsetof(gyroConfig_t, gyro_lowpass_hz) },
     { "gyro_lowpass_order",        VAR_UINT8  | MASTER_VALUE, .config.minmax = { 0, GYRO_LPF_ORDER_MAX}, PG_GYRO_CONFIG, offsetof(gyroConfig_t, gyro_lowpass_order) },
 
-    { "gyro_lowpass2_type",         VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_LOWPASS_TYPE }, PG_GYRO_CONFIG, offsetof(gyroConfig_t, gyro_lowpass2_type) },
+    { "gyro_lowpass2_type",         VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_GYRO_LOWPASS_TYPE }, PG_GYRO_CONFIG, offsetof(gyroConfig_t, gyro_lowpass2_type) },
     { "gyro_lowpass2_hz",           VAR_UINT16  | MASTER_VALUE, .config.minmax = { 0,  16000 }, PG_GYRO_CONFIG, offsetof(gyroConfig_t, gyro_lowpass2_hz) },
     { "gyro_lowpass2_order",        VAR_UINT8  | MASTER_VALUE, .config.minmax = { 0, GYRO_LPF_ORDER_MAX}, PG_GYRO_CONFIG, offsetof(gyroConfig_t, gyro_lowpass2_order) },
 
@@ -661,7 +674,7 @@ const clivalue_t valueTable[] = {
 #endif
 
 // PG_PID_PROFILE
-    { "dterm_lowpass_type",         VAR_UINT8  | PROFILE_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_LOWPASS_TYPE }, PG_PID_PROFILE, offsetof(pidProfile_t, dterm_filter_type) },
+    { "dterm_lowpass_type",         VAR_UINT8  | PROFILE_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_DTERM_LOWPASS_TYPE }, PG_PID_PROFILE, offsetof(pidProfile_t, dterm_filter_type) },
     { "dterm_lowpass_hz",           VAR_INT16  | PROFILE_VALUE, .config.minmax = { 0, 16000 }, PG_PID_PROFILE, offsetof(pidProfile_t, dterm_lowpass_hz) },
     { "dterm_lowpass2_hz",          VAR_INT16  | PROFILE_VALUE, .config.minmax = { 0, 16000 }, PG_PID_PROFILE, offsetof(pidProfile_t, dterm_lowpass2_hz) },
     { "dterm_notch_hz",             VAR_UINT16 | PROFILE_VALUE, .config.minmax = { 0, 16000 }, PG_PID_PROFILE, offsetof(pidProfile_t, dterm_notch_hz) },
