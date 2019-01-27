@@ -165,6 +165,7 @@ typedef struct pidProfile_s {
     uint8_t dterm_cut_range_hz;             // Biquad to prevent high frequency gyro noise from removing the dterm cut
     uint8_t dterm_cut_lowpass_hz;           // First order lowpass to delay and smooth dterm cut factor
     uint8_t motor_output_limit;             // Upper limit of the motor output (percent)
+    uint8_t airmode_noise_reduction;        // Maximum DC component of throttle change to mix into throttle to prevent airmode mirroring noise
 } pidProfile_t;
 
 PG_DECLARE_ARRAY(pidProfile_t, MAX_PROFILE_COUNT, pidProfiles);
@@ -219,6 +220,10 @@ bool pidAntiGravityEnabled(void);
 #ifdef USE_THRUST_LINEARIZATION
 float pidApplyThrustLinearization(float motorValue);
 float pidCompensateThrustLinearization(float throttle);
+#endif
+#ifdef USE_AIRMODE_LPF
+void pidUpdateAirmodeLpf(float currentOffset);
+float pidGetAirmodeThrottleOffset();
 #endif
 
 #ifdef UNIT_TEST
