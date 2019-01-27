@@ -41,6 +41,12 @@
 #include "sensors/esc_sensor.h"
 
 #include "current.h"
+enum {
+      DEBUG_CURRENT_MILLIVOLTS = 0,
+      DEBUG_CURRENT_CENTIAMPS = 1,
+      DEBUG_CURRENT_METER_AMPERAGE_LATEST = 2,
+      DEBUG_CURRENT_METER_MAH_DRAWN = 3,
+};
 
 const char * const currentMeterSourceNames[CURRENT_METER_COUNT] = {
     "NONE", "ADC", "VIRTUAL", "ESC", "MSP"
@@ -118,8 +124,8 @@ static int32_t currentMeterADCToCentiamps(const uint16_t src)
     // y=x/m+b m is scale in (mV/10A) and b is offset in (mA)
     int32_t centiAmps = (millivolts * 10000 / (int32_t)config->scale + (int32_t)config->offset) / 10;
 
-    DEBUG_SET(DEBUG_CURRENT, 0, millivolts);
-    DEBUG_SET(DEBUG_CURRENT, 1, centiAmps);
+    DEBUG_SET(DEBUG_CURRENT, DEBUG_CURRENT_MILLIVOLTS, millivolts);
+    DEBUG_SET(DEBUG_CURRENT, DEBUG_CURRENT_CENTIAMPS, centiAmps);
 
     return centiAmps; // Returns Centiamps to maintain compatability with the rest of the code
 }
@@ -167,8 +173,8 @@ void currentMeterADCRead(currentMeter_t *meter)
     meter->amperage = currentMeterADCState.amperage;
     meter->mAhDrawn = currentMeterADCState.mahDrawnState.mAhDrawn;
 
-    DEBUG_SET(DEBUG_CURRENT, 2, meter->amperageLatest);
-    DEBUG_SET(DEBUG_CURRENT, 3, meter->mAhDrawn);
+    DEBUG_SET(DEBUG_CURRENT, DEBUG_CURRENT_METER_AMPERAGE_LATEST, meter->amperageLatest);
+    DEBUG_SET(DEBUG_CURRENT, DEBUG_CURRENT_METER_MAH_DRAWN, meter->mAhDrawn);
 }
 
 //
@@ -236,6 +242,9 @@ void currentMeterESCReadCombined(currentMeter_t *meter)
     meter->amperageLatest = currentMeterESCState.amperage;
     meter->amperage = currentMeterESCState.amperage;
     meter->mAhDrawn = currentMeterESCState.mAhDrawn;
+
+    DEBUG_SET(DEBUG_CURRENT, DEBUG_CURRENT_METER_AMPERAGE_LATEST, meter->amperageLatest);
+    DEBUG_SET(DEBUG_CURRENT, DEBUG_CURRENT_METER_MAH_DRAWN, meter->mAhDrawn);
 }
 
 void currentMeterESCReadMotor(uint8_t motorNumber, currentMeter_t *meter)
@@ -245,6 +254,11 @@ void currentMeterESCReadMotor(uint8_t motorNumber, currentMeter_t *meter)
         meter->amperage = escData->current;
         meter->amperageLatest = escData->current;
         meter->mAhDrawn = escData->consumption;
+
+        DEBUG_SET(DEBUG_CURRENT, 0, motorNumber);
+        DEBUG_SET(DEBUG_CURRENT, 1, escData->dataAge)
+        DEBUG_SET(DEBUG_CURRENT, DEBUG_CURRENT_METER_AMPERAGE_LATEST, meter->amperageLatest);
+        DEBUG_SET(DEBUG_CURRENT, DEBUG_CURRENT_METER_MAH_DRAWN, meter->mAhDrawn);
     } else {
         currentMeterReset(meter);
     }
